@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stamp — แต้มของฉัน</title>
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #fff; --ink: #1a1d24; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #4f46e5; --accent-soft: #eef2ff; --ok: #059669; --ok-bg: #ecfdf5; --err: #dc2626; --err-bg: #fef2f2;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 440px; margin: 0 auto; padding: 16px 16px 40px; }
+  .card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,.05); margin-bottom: 14px; }
+  .loading { text-align: center; padding: 60px 0; color: var(--muted); }
+  .hidden { display: none !important; }
+  .center { text-align: center; }
+  h2 { margin: 0 0 6px; font-size: 20px; }
+  h3 { margin: 0 0 12px; font-size: 16px; }
+  p.sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+  .banner { border-radius: 16px; padding: 18px 20px; margin-bottom: 14px; }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+  .banner.err { background: var(--err-bg); color: var(--err); }
+  .banner .big { font-size: 26px; font-weight: 700; }
+  .banner .small { font-size: 14px; opacity: .9; }
+
+  .hello { color: var(--muted); font-size: 14px; }
+  .total { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 18px; }
+  .total b { font-size: 48px; line-height: 1; }
+  .stamps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .stamp { aspect-ratio: 1; border-radius: 50%; border: 2px dashed var(--line);
+           display: grid; place-items: center; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .stamp.on { background: var(--accent); border: 2px solid var(--accent); color: #fff; }
+  .stamp.goal { border-color: var(--accent); color: var(--accent); }
+  .stamp.on.goal { color: #fff; }
+
+  .rw { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .rw:first-of-type { border-top: 0; }
+  .rw .name { font-weight: 500; }
+  .rw .note { font-size: 12px; color: var(--muted); }
+  .rw button, .rw .pill { flex: none; }
+  .pill { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; background: var(--bg); color: var(--muted); white-space: nowrap; }
+
+  .row { display: flex; gap: 8px; }
+  input { flex: 1; min-width: 0; font: inherit; font-size: 17px; padding: 12px 14px; border: 1.5px solid var(--line);
+          border-radius: 12px; outline: none; text-transform: uppercase; letter-spacing: .1em; }
+  input:focus { border-color: var(--accent); }
+  button { font: inherit; font-size: 16px; font-weight: 600; padding: 12px 18px; border: 0; border-radius: 12px;
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.sm { font-size: 14px; padding: 8px 16px; }
+  button.block { width: 100%; }
+  button.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--line); }
+  button:disabled { opacity: 1; background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
+
+  .hist { list-style: none; margin: 0; padding: 0; }
+  .hist li { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .hist li:first-child { border-top: 0; }
+  .hist .when { color: var(--muted); font-size: 12px; }
+  .hist .plus { color: var(--ok); font-weight: 600; }
+  .hist .minus { color: var(--err); font-weight: 600; }
+  .empty { color: var(--muted); font-size: 14px; }
+
+  .policy { background: var(--bg); border-radius: 12px; padding: 14px 16px; font-size: 14px; line-height: 1.7; margin-bottom: 16px; }
+  .policy ul { margin: 6px 0 0; padding-left: 18px; }
+
+  #cQr { display: inline-block; padding: 14px; background: #fff; border: 1px solid var(--line); border-radius: 16px; margin: 10px 0 8px; }
+  #cQr img, #cQr canvas { display: block; }
+  .code { font-family: ui-monospace, Menlo, monospace; font-size: 22px; letter-spacing: .14em; font-weight: 600; }
+  .timer { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+  .status { margin-top: 14px; padding: 12px; border-radius: 12px; font-weight: 600; background: var(--bg); color: var(--muted); }
+  .status.err { background: var(--err-bg); color: var(--err); }
+  .done-ico { width: 64px; height: 64px; border-radius: 50%; background: var(--ok-bg); color: var(--ok);
+              display: grid; place-items: center; font-size: 32px; margin: 4px auto 12px; }
+
+  .kv { display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; text-align: left; }
+  .kv span { color: var(--muted); }
+  .mono { font-family: ui-monospace, Menlo, monospace; letter-spacing: .08em; }
+  .clock { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 14px 0 0; color: var(--ok); }
+  .pulse { display: inline-grid; place-items: center; border-radius: 50%; animation: pulse 1.4s ease-out infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(5,150,105,.45); } 100% { box-shadow: 0 0 0 22px rgba(5,150,105,0); } }
+  .sheet-bg { position: fixed; inset: 0; background: rgba(17,17,22,.45); display: flex; align-items: flex-end; justify-content: center; }
+  .sheet { background: #fff; width: 100%; max-width: 440px; border-radius: 20px 20px 0 0; padding: 22px 20px 28px; }
+  .sheet .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="vLoading" class="loading">กำลังโหลด…</div>
+
+  <!-- PDPA -->
+  <div id="vConsent" class="card hidden">
+    <h2>ก่อนเริ่มสะสมแต้ม</h2>
+    <p class="sub">กรุณาอ่านและยอมรับการเก็บข้อมูลส่วนบุคคล</p>
+    <div class="policy">
+      แคมเปญนี้จะเก็บข้อมูลต่อไปนี้ เพื่อใช้สะสมแต้มและแลกของรางวัลในแคมเปญเท่านั้น
+      <ul>
+        <li>ชื่อที่แสดงและ LINE User ID</li>
+        <li>เลขใบเสร็จ ยอดซื้อ และสาขาที่ร่วมรายการ</li>
+        <li>ประวัติการสะสมและแลกของรางวัล</li>
+      </ul>
+    </div>
+    <button class="block" id="btnConsent">ยอมรับและเริ่มสะสมแต้ม</button>
+  </div>
+
+  <!-- รับแต้มจาก QR ประจำสาขา -->
+  <div id="vStatic" class="card hidden">
+    <p class="sub" style="margin-bottom:2px" id="stBranch"></p>
+    <div class="total"><b id="stPoints"></b><span>แต้ม</span></div>
+    <div id="stMsg" class="banner err hidden" style="padding:12px 14px;font-size:14px"></div>
+    <button class="block" id="btnStatic">รับแต้ม</button>
+    <button class="ghost block" id="btnStaticSkip" style="margin-top:10px">ดูแต้มของฉัน</button>
+  </div>
+
+  <!-- หน้าหลัก -->
+  <div id="vMain" class="hidden">
+    <div id="banner" class="banner hidden"></div>
+
+    <div class="card">
+      <div class="hello" id="hello">สวัสดี</div>
+      <div class="total"><b id="total">0</b><span>แต้ม</span></div>
+      <div class="stamps" id="stamps"></div>
+    </div>
+
+    <div class="card">
+      <h3>แลกของรางวัล</h3>
+      <div id="rewards"></div>
+    </div>
+
+
+    <div class="card">
+      <h3>ประวัติล่าสุด</h3>
+      <ul class="hist" id="hist"></ul>
+    </div>
+  </div>
+
+  <!-- คูปองแลกรางวัล -->
+  <div id="vCoupon" class="card center hidden">
+    <p class="sub" style="margin-bottom:2px">คูปองแลกรางวัล</p>
+    <h2 id="cReward"></h2>
+    <div id="cQr"></div>
+    <div class="code" id="cCode"></div>
+    <div class="timer">หมดอายุใน <span id="cTimer">--:--</span></div>
+    <div class="status" id="cStatus">ยื่นหน้าจอนี้ให้พนักงานสแกน</div>
+    <button class="ghost block" id="btnBack" style="margin-top:12px">กลับ</button>
+  </div>
+
+  <!-- หลักฐานการใช้สิทธิ์ (โชว์พนักงาน) -->
+  <div id="vProof" class="card center hidden">
+    <div class="pulse"><div class="done-ico" style="margin:0">✓</div></div>
+    <p class="sub" style="margin:12px 0 2px">ใช้สิทธิ์แล้ว · โชว์หน้านี้ให้พนักงาน</p>
+    <h2 id="pReward"></h2>
+    <div class="kv"><span>ชื่อ</span><b id="pName"></b></div>
+    <div class="kv"><span>ใช้สิทธิ์เมื่อ</span><b id="pUsed"></b></div>
+    <div class="kv"><span>รหัส</span><b id="pCode" class="mono"></b></div>
+    <div class="clock" id="pClock">--:--:--</div>
+    <p class="sub" style="margin:0 0 14px">เวลาขณะนี้ (เดินต่อเนื่อง · ภาพหน้าจอจะไม่เดิน)</p>
+    <button class="ghost block" id="btnProofBack">กลับหน้าแต้มของฉัน</button>
+  </div>
+
+  <!-- สำเร็จ -->
+  <div id="vDone" class="card center hidden">
+    <div class="done-ico">✓</div>
+    <h2 id="dTitle"></h2>
+    <p class="sub" id="dText"></p>
+    <div class="code" id="dCode" style="margin-bottom:16px"></div>
+    <button class="block" id="btnForm">กรอกฟอร์มลงทะเบียน</button>
+    <button class="ghost block" id="btnHome" style="margin-top:10px">กลับหน้าแต้มของฉัน</button>
+  </div>
+</div>
+
+<!-- กล่องยืนยัน -->
+<div id="sheet" class="sheet-bg hidden">
+  <div class="sheet">
+    <h2 id="sTitle"></h2>
+    <p class="sub" id="sText"></p>
+    <div class="btns">
+      <button class="ghost" id="sNo">ยกเลิก</button>
+      <button id="sYes">ยืนยัน</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+const CONFIG = {
+  LIFF_ID: '2011980277-oZ3HluAy',     // LIFF ID ของหน้า Customer
+  API_URL: 'https://script.google.com/macros/s/AKfycbyMks7dA8tzqFwd-_z6_oo5QUvoqmqfwAaydYW5Z83uEYdtibXg0XKvv6hHvkK5qqKa/exec',
+  POLL_MS: 3000,
+};
+const GOAL = 15;
+
+const $ = id => document.getElementById(id);
+const views = ['vLoading', 'vConsent', 'vStatic', 'vMain', 'vCoupon', 'vProof', 'vDone'];
+const show = v => { views.forEach(x => $(x).classList.toggle('hidden', x !== v)); window.scrollTo(0, 0); };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function api(action, data = {}) {
+  const res = await fetch(CONFIG.API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, idToken: liff.getIDToken(), ...data }),
+  });
+  const j = await res.json();
+  if (!j.ok) { const e = new Error(j.error); e.code = j.code; throw e; }
+  return j;
+}
+
+function banner(type, big, small) {
+  const b = $('banner');
+  b.className = 'banner ' + type;
+  b.innerHTML = '<div class="big"></div><div class="small"></div>';
+  b.querySelector('.big').textContent = big;
+  b.querySelector('.small').textContent = small || '';
+}
+
+function confirmSheet(title, text) {
+  return new Promise(resolve => {
+    $('sTitle').textContent = title; $('sText').textContent = text;
+    $('sheet').classList.remove('hidden');
+    const done = v => { $('sheet').classList.add('hidden'); resolve(v); };
+    $('sYes').onclick = () => done(true);
+    $('sNo').onclick = () => done(false);
+  });
+}
+
+let data = null;
+
+const CACHE_KEY = 'stamp_points_v1';
+function render(d) {
+  data = d;
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch (e) {}
+  $('hello').textContent = 'สวัสดี ' + (d.name || '');
+  $('total').textContent = d.total;
+
+  const goals = d.rewards.map(r => r.points);
+  $('stamps').innerHTML = Array.from({ length: GOAL }, (_, i) => {
+    const n = i + 1;
+    const cls = ['stamp', n <= d.total ? 'on' : '', goals.includes(n) ? 'goal' : ''].join(' ');
+    return `<div class="${cls}">${goals.includes(n) ? n : ''}</div>`;
+  }).join('');
+
+  $('rewards').innerHTML = d.rewards.map(r => {
+    let right;
+    if (r.state === 'ok') right = `<button class="sm" data-rw="${esc(r.id)}">${r.type === 'form' ? 'ลงทะเบียน' : 'แลก'}</button>`;
+    else if (r.state === 'LIMIT' && r.formUrl) right = `<button class="sm ghost" data-form="${esc(r.formUrl)}">เปิดฟอร์ม</button>`;
+    else if (r.state === 'LIMIT' && r.proofOpen) right = `<button class="sm ghost" data-proof="${esc(r.id)}">ดูหลักฐาน</button>`;
+    else right = `<button class="sm" disabled>${r.state === 'LIMIT' ? 'แลกแล้ว' : 'แลก'}</button>`;
+    const sub = r.usedAt ? 'ใช้สิทธิ์แล้ว ' + new Date(r.usedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
+      : r.state !== 'ok' && r.note ? r.note
+      : (r.type === 'form' ? 'จำนวนจำกัด · ใช้ได้ 1 ครั้ง' : 'ใช้ได้ 1 ครั้ง');
+    return `<div class="rw"><div><div class="name">${r.points} แต้ม · ${esc(r.name)}</div>
+      ${sub ? `<div class="note">${sub}</div>` : ''}</div>${right}</div>`;
+  }).join('');
+  document.querySelectorAll('[data-rw]').forEach(b => b.onclick = () => redeem(b.dataset.rw));
+  document.querySelectorAll('[data-form]').forEach(b => b.onclick = () => openForm(b.dataset.form));
+  document.querySelectorAll('[data-proof]').forEach(b => b.onclick = () => {
+    const r = d.rewards.find(x => x.id === b.dataset.proof);
+    showProof({ rewardName: r.name, usedAt: r.usedAt, code: r.usedCode, name: d.name });
+  });
+
+  const fmt = ts => new Date(ts).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  $('hist').innerHTML = d.history.length
+    ? d.history.map(h => `<li><div>${h.type === 'redeem' ? 'ใช้สิทธิ์แลกรางวัล' : 'สะสมแต้ม'}${h.branchName ? ' · ' + esc(h.branchName) : ''}
+        <div class="when">${fmt(h.at)}</div></div>
+        <span class="plus">${h.type === 'redeem' ? '✓' : '+' + h.points}</span></li>`).join('')
+    : '<li class="empty">ยังไม่มีประวัติ</li>';
+}
+
+async function refresh() { render(await api('myPoints')); }
+const useData = r => { if (r && r.data) render(r.data); };
+
+async function claim(code) {
+  try {
+    const r = await api('claimToken', { token: code });
+    banner('ok', `+${r.points} แต้ม`, `สาขา ${r.branchName} · รวม ${r.total} แต้ม`);
+  } catch (e) {
+    if (e.code === 'AUTH') { location.reload(); return; }
+    banner('err', 'รับแต้มไม่สำเร็จ', e.message);
+  }
+}
+
+/* ---------- แลกรางวัล ---------- */
+let pollTimer, tickTimer;
+const stopTimers = () => { clearInterval(pollTimer); clearInterval(tickTimer); };
+
+async function redeem(id) {
+  const rw = data.rewards.find(r => r.id === id);
+  const ok = rw.type === 'form'
+    ? await confirmSheet('ลงทะเบียนบัตรคอนเสิร์ต', `สิทธิ์นี้ใช้ได้ 1 ครั้ง แต้มของคุณไม่ลด`)
+    : await confirmSheet('ใช้สิทธิ์ต่อหน้าพนักงาน', `กด “ยืนยัน” เมื่ออยู่ที่จุดแลกรางวัลเท่านั้น “${rw.name}” ใช้ได้ 1 ครั้ง แต้มของคุณไม่ลด`);
+  if (!ok) return;
+  try {
+    const r = await api('requestRedeem', { rewardId: id });
+    useData(r);
+    if (r.type === 'form') return showDone('ลงทะเบียนสิทธิ์สำเร็จ',
+      'กรอกฟอร์มให้ครบ แล้วแสดงรหัสนี้ที่หน้างานเพื่อรับบัตร', r.code, r.formUrl);
+    showProof(r);
+  } catch (e) {
+    banner('err', 'ใช้สิทธิ์ไม่สำเร็จ', e.message);
+    await refresh();
+  }
+}
+
+let clockTimer;
+function showProof(r) {
+  $('pReward').textContent = r.rewardName;
+  $('pName').textContent = r.name || '';
+  $('pUsed').textContent = new Date(r.usedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' });
+  $('pCode').textContent = r.code;
+  const tick = () => { $('pClock').textContent = new Date().toLocaleTimeString('th-TH', { hour12: false }); };
+  tick(); clearInterval(clockTimer); clockTimer = setInterval(tick, 1000);
+  show('vProof');
+}
+$('btnProofBack').onclick = () => { clearInterval(clockTimer); $('banner').classList.add('hidden'); show('vMain'); };
+
+let formUrl = '';
+function showDone(title, text, code, url) {
+  $('dTitle').textContent = title; $('dText').textContent = text;
+  $('dCode').textContent = code || ''; $('dCode').classList.toggle('hidden', !code);
+  formUrl = url || ''; $('btnForm').classList.toggle('hidden', !formUrl);
+  show('vDone');
+}
+function openForm(url) {
+  if (liff.isInClient && liff.isInClient()) liff.openWindow({ url, external: false });
+  else window.open(url, '_blank');
+}
+
+$('btnForm').onclick = () => openForm(formUrl);
+$('btnBack').onclick = () => { stopTimers(); show('vMain'); };
+$('btnHome').onclick = () => { $('banner').classList.add('hidden'); show('vMain'); };
+
+/* ---------- เริ่มต้น (เรียก API ให้น้อยที่สุด) ---------- */
+let staticQ = null, initData = null;
+async function goHome() { if (!data) await refresh(); show('vMain'); }
+
+function showStatic(info) {
+  $('stBranch').textContent = 'สาขา ' + info.branchName;
+  $('stPoints').textContent = '+' + info.points;
+  $('stMsg').classList.add('hidden');
+  show('vStatic');
+}
+
+$('btnStatic').onclick = async () => {
+  const btn = $('btnStatic'); btn.disabled = true;
+  try {
+    const r = await api('claimStatic', staticQ);
+    useData(r);
+    banner('ok', `+${r.points} แต้ม`, `สาขา ${r.branchName} · รวม ${r.total} แต้ม`);
+    show('vMain');
+  } catch (e) {
+    if (e.code === 'AUTH') { location.reload(); return; }
+    $('stMsg').textContent = e.message; $('stMsg').classList.remove('hidden');
+  }
+  btn.disabled = false;
+};
+$('btnStaticSkip').onclick = () => { $('banner').classList.add('hidden'); goHome(); };
+
+// หลังยอมรับ PDPA แล้ว: มี QR สาขา → หน้ารับแต้ม, ไม่มี → หน้าแต้มของฉัน
+async function afterConsent(d) {
+  render(d);
+  if (d.static) return showStatic(d.static);
+  if (d.staticError) banner('err', 'QR ไม่ถูกต้อง', d.staticError);
+  const t = new URLSearchParams(location.search).get('t');
+  if (t) { history.replaceState(null, '', location.pathname); await claim(t); await refresh(); }
+  show('vMain');
+}
+
+async function main() {
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('b')) {
+    staticQ = { b: qs.get('b'), p: qs.get('p'), s: qs.get('s') };
+    history.replaceState(null, '', location.pathname); // กันรีเฟรชแล้วสแกนซ้ำ
+  }
+  // แสดงข้อมูลล่าสุดที่เคยโหลดไว้ทันที ระหว่างรอข้อมูลใหม่ (เฉพาะกรณีไม่ได้สแกน QR)
+  if (!staticQ) {
+    try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (c && c.consented) { render(c); show('vMain'); } } catch (e) {}
+  }
+  try {
+    await liff.init({ liffId: CONFIG.LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+    initData = await api('init', staticQ || {});
+    if (!initData.consented) return show('vConsent');
+    await afterConsent(initData);
+  } catch (e) {
+    if (!data) $('vLoading').textContent = 'เกิดข้อผิดพลาด: ' + (e.message || e);
+  }
+}
+
+$('btnConsent').onclick = async () => {
+  const btn = $('btnConsent'); btn.disabled = true;
+  try {
+    const r = await api('acceptConsent');
+    await afterConsent({ ...r.data, static: initData && initData.static, staticError: initData && initData.staticError });
+  }
+  catch (e) { btn.disabled = false; $('btnConsent').textContent = 'ลองใหม่อีกครั้ง · ' + e.message; }
+};
+
+if ($('btnClaim')) $('btnClaim').onclick = async () => {
+  const code = $('code').value.replace(/\s/g, '');
+  if (!code) return;
+  const btn = $('btnClaim'); btn.disabled = true;
+  await claim(code);
+  $('code').value = '';
+  try { await refresh(); } catch (e) {}
+  btn.disabled = false;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+main();
+</script>
+</body>
+</html>
