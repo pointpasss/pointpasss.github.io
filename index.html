@@ -194,6 +194,9 @@ const CONFIG = {
   LIFF_ID: '2011995146-BaNWCdWl',     // LIFF ID ของหน้า Customer
   API_URL: 'https://script.google.com/macros/s/AKfycbyMks7dA8tzqFwd-_z6_oo5QUvoqmqfwAaydYW5Z83uEYdtibXg0XKvv6hHvkK5qqKa/exec',
   POLL_MS: 3000,
+  // ฟอร์มลงทะเบียนบัตรคอนเสิร์ต: กดแลกแล้วเปิดฟอร์มนี้ทันที พร้อมกรอกรหัส ref ให้อัตโนมัติ
+  CONCERT_FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSesdnvBoB5VW_0kOZRh8JjE-jPf2KPyGltArc6HYDoAuQ2D_w/viewform',
+  CONCERT_REF_ENTRY: 'entry.0000000000', // ← ใส่ entry ID ของช่อง "รหัส ref" ในฟอร์ม
 };
 const GOAL = 15;
 
@@ -250,7 +253,7 @@ function render(d) {
   $('rewards').innerHTML = d.rewards.map(r => {
     let right;
     if (r.state === 'ok') right = `<button class="sm" data-rw="${esc(r.id)}">${r.type === 'form' ? 'ลงทะเบียน' : 'แลก'}</button>`;
-    else if (r.state === 'LIMIT' && r.formUrl) right = `<button class="sm ghost" data-form="${esc(r.formUrl)}">เปิดฟอร์ม</button>`;
+    else if (r.state === 'LIMIT' && r.type === 'form') right = `<button class="sm ghost" data-form="${esc(formLink(r.usedCode))}">เปิดฟอร์ม</button>`;
     else if (r.state === 'LIMIT' && r.proofOpen) right = `<button class="sm ghost" data-proof="${esc(r.id)}">ดูหลักฐาน</button>`;
     else right = `<button class="sm" disabled>${r.state === 'LIMIT' ? 'แลกแล้ว' : 'แลก'}</button>`;
     const sub = r.usedAt ? 'ใช้สิทธิ์แล้ว ' + new Date(r.usedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
@@ -300,8 +303,12 @@ async function redeem(id) {
   try {
     const r = await api('requestRedeem', { rewardId: id });
     useData(r);
-    if (r.type === 'form') return showDone('ลงทะเบียนสิทธิ์สำเร็จ',
-      'กรอกฟอร์มให้ครบ แล้วแสดงรหัสนี้ที่หน้างานเพื่อรับบัตร', r.code, r.formUrl);
+    if (r.type === 'form') {
+      const url = formLink(r.code);
+      showDone('ลงทะเบียนสิทธิ์สำเร็จ',
+        'กรอกฟอร์มให้ครบ แล้วแสดงรหัสนี้ที่หน้างานเพื่อรับบัตร', r.code, url);
+      return openForm(url);
+    }
     showProof(r);
   } catch (e) {
     banner('err', 'ใช้สิทธิ์ไม่สำเร็จ', e.message);
@@ -320,6 +327,13 @@ function showProof(r) {
   show('vProof');
 }
 $('btnProofBack').onclick = () => { clearInterval(clockTimer); $('banner').classList.add('hidden'); show('vMain'); };
+
+// ลิงก์ฟอร์มคอนเสิร์ตพร้อมกรอกรหัส ref ไว้ล่วงหน้า
+function formLink(code) {
+  const u = new URL(CONFIG.CONCERT_FORM_URL);
+  if (code) { u.searchParams.set('usp', 'pp_url'); u.searchParams.set(CONFIG.CONCERT_REF_ENTRY, code); }
+  return u.toString();
+}
 
 let formUrl = '';
 function showDone(title, text, code, url) {
