@@ -205,13 +205,42 @@ const views = ['vLoading', 'vConsent', 'vStatic', 'vMain', 'vCoupon', 'vProof', 
 const show = v => { views.forEach(x => $(x).classList.toggle('hidden', x !== v)); window.scrollTo(0, 0); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-async function api(action, data = {}) {
-  const res = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, idToken: liff.getIDToken(), ...data }),
-  });
-  const j = await res.json();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const BUSY_MSG = 'ขณะนี้มีผู้ใช้งานจำนวนมาก กรุณาลองใหม่อีกครั้ง';
+const READ_ACTIONS = { init: 1, myPoints: 1 }; // อ่านอย่างเดียว ลองซ้ำได้เสมอ
+
+// token LINE หมดอายุ (เปิดหน้าค้างไว้นาน) → ออกแล้วเข้าใหม่เพื่อรับ token ใหม่ · กันวนซ้ำภายใน 1 นาที
+function relogin() {
+  let last = 0;
+  try { last = Number(sessionStorage.getItem('relogin_at')) || 0; } catch (e) {}
+  if (Date.now() - last < 60000) return false;
+  try { sessionStorage.setItem('relogin_at', String(Date.now())); } catch (e) {}
+  liff.logout(); location.reload();
+  return true;
+}
+function tokenExpired() {
+  const t = liff.getDecodedIDToken && liff.getDecodedIDToken();
+  return !t || t.exp * 1000 < Date.now() + 60000;
+}
+const never = () => new Promise(() => {});
+
+async function api(action, data = {}, retries = 2) {
+  if (tokenExpired() && relogin()) return never();
+  let res, j;
+  try {
+    res = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, idToken: liff.getIDToken(), ...data }),
+    });
+  } catch (e) {
+    // เน็ตหลุด หรือ Google ปฏิเสธเพราะคนใช้เยอะ · คำสั่งเขียนข้อมูลไม่ลองซ้ำเอง เผื่อฝั่งเซิร์ฟเวอร์ทำไปแล้ว
+    if (READ_ACTIONS[action] && retries > 0) { await sleep(1500 + Math.random() * 2500); return api(action, data, retries - 1); }
+    const err = new Error('เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); err.code = 'NETWORK'; throw err;
+  }
+  try { j = await res.json(); } catch (e) { j = { ok: false, code: 'BUSY', error: BUSY_MSG }; } // หน้า error ของ Google = สคริปต์ไม่ได้ทำงาน
+  if (!j.ok && j.code === 'BUSY' && retries > 0) { await sleep(1500 + Math.random() * 2500); return api(action, data, retries - 1); }
+  if (!j.ok && j.code === 'AUTH' && relogin()) return never();
   if (!j.ok) { const e = new Error(j.error); e.code = j.code; throw e; }
   return j;
 }
@@ -283,9 +312,9 @@ const useData = r => { if (r && r.data) render(r.data); };
 async function claim(code) {
   try {
     const r = await api('claimToken', { token: code });
+    if (r.data) render(r.data); else await refresh();
     banner('ok', `+${r.points} แต้ม`, `สาขา ${r.branchName} · รวม ${r.total} แต้ม`);
   } catch (e) {
-    if (e.code === 'AUTH') { location.reload(); return; }
     banner('err', 'รับแต้มไม่สำเร็จ', e.message);
   }
 }
@@ -294,12 +323,16 @@ async function claim(code) {
 let pollTimer, tickTimer;
 const stopTimers = () => { clearInterval(pollTimer); clearInterval(tickTimer); };
 
+let redeeming = false; // กันกดแลกซ้ำระหว่างรอเซิร์ฟเวอร์
 async function redeem(id) {
+  if (redeeming) return;
   const rw = data.rewards.find(r => r.id === id);
   const ok = rw.type === 'form'
     ? await confirmSheet('ลงทะเบียนบัตรคอนเสิร์ต', `สิทธิ์นี้ใช้ได้ 1 ครั้ง แต้มของคุณไม่ลด`)
     : await confirmSheet('ใช้สิทธิ์ต่อหน้าพนักงาน', `กด “ยืนยัน” เมื่ออยู่ที่จุดแลกรางวัลเท่านั้น “${rw.name}” ใช้ได้ 1 ครั้ง แต้มของคุณไม่ลด`);
-  if (!ok) return;
+  if (!ok || redeeming) return;
+  redeeming = true;
+  document.querySelectorAll('[data-rw]').forEach(b => b.disabled = true);
   try {
     const r = await api('requestRedeem', { rewardId: id });
     useData(r);
@@ -312,7 +345,10 @@ async function redeem(id) {
     showProof(r);
   } catch (e) {
     banner('err', 'ใช้สิทธิ์ไม่สำเร็จ', e.message);
-    await refresh();
+    try { await refresh(); } catch (e2) {}
+  } finally {
+    redeeming = false;
+    document.querySelectorAll('[data-rw]').forEach(b => b.disabled = false);
   }
 }
 
@@ -370,7 +406,6 @@ $('btnStatic').onclick = async () => {
     banner('ok', `+${r.points} แต้ม`, `สาขา ${r.branchName} · รวม ${r.total} แต้ม`);
     show('vMain');
   } catch (e) {
-    if (e.code === 'AUTH') { location.reload(); return; }
     $('stMsg').textContent = e.message; $('stMsg').classList.remove('hidden');
   }
   btn.disabled = false;
@@ -383,7 +418,7 @@ async function afterConsent(d) {
   if (d.static) return showStatic(d.static);
   if (d.staticError) banner('err', 'QR ไม่ถูกต้อง', d.staticError);
   const t = new URLSearchParams(location.search).get('t');
-  if (t) { history.replaceState(null, '', location.pathname); await claim(t); await refresh(); }
+  if (t) { history.replaceState(null, '', location.pathname); await claim(t); }
   show('vMain');
 }
 
@@ -423,7 +458,6 @@ if ($('btnClaim')) $('btnClaim').onclick = async () => {
   const btn = $('btnClaim'); btn.disabled = true;
   await claim(code);
   $('code').value = '';
-  try { await refresh(); } catch (e) {}
   btn.disabled = false;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
